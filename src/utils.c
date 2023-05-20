@@ -78,4 +78,26 @@ uint8_t ip_prefix_match(uint8_t *ipa, uint8_t *ipb)
 uint16_t checksum16(uint16_t *data, size_t len)
 {
     // TO-DO
+    uint32_t sum = 0;
+    // 每2字节一组
+    while (len > 1)
+    {
+        sum += *data++;
+        len -= 2;
+        // 溢出16位
+        while (sum >> 16)
+            // 高16位加低16位
+            sum = (sum >> 16) + (sum & 0xffff);
+    }
+
+    // 剩余8bit
+    if (len)
+        sum += *(uint8_t *)data;
+    while (sum >> 16)
+        sum = (sum >> 16) + (sum & 0xffff);
+
+    // 逐位取反
+    sum = ~(uint16_t)sum;
+
+    return (uint16_t)sum;
 }

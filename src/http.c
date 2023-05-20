@@ -93,8 +93,63 @@ static void send_file(tcp_connect_t* tcp, const char* url) {
 
     注意，本实验的WEB服务器网页存放在XHTTP_DOC_DIR目录中
     */
+    // TODO
 
-   // TODO
+    // 解析url路径
+    memcpy(file_path, XHTTP_DOC_DIR, sizeof(XHTTP_DOC_DIR));
+
+    // path中只有'/'，默认为index.html
+    // url可能的其他取值 /imagex.jpg   /page1.html   /404.html
+    // printf("%s\n",url);
+    if(strlen(url) == 1){
+        strcat(file_path, "/index.html");
+    }else{
+        strcat(file_path, url);
+    }
+    // 二进制方法打开文件
+    file = fopen(file_path, "rb");  
+
+    // 填写http响应消息
+    // 文件不存在XHTTP_DOC_DIR目录下，发送404 NOT FOUND
+    if(file == NULL){
+        // 首部行
+        // 状态行
+        sprintf(tx_buffer, "HTTP/1.0 404 Not Found\r\n");
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        // 提供服务者缺省
+        sprintf(tx_buffer, "Sever: \r\n");  
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        // sprintf(tx_buffer, "Content-Type: text/html\r\n");
+        sprintf(tx_buffer, "Content-Type: \r\n");
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        sprintf(tx_buffer, "\r\n");
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+    }
+    
+    // 文件存在XHTTP_DOC_DIR目录下
+    else{
+        // 首部行
+        // 状态行
+        sprintf(tx_buffer, "HTTP/1.0 200 OK\r\n");
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        // 提供服务者缺省
+        sprintf(tx_buffer, "Sever: \r\n");  
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        // 由于需要传输text与jpg直接缺省
+        sprintf(tx_buffer, "Content-Type: \r\n");  
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        sprintf(tx_buffer, "\r\n");
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+
+        //读取html以及jpg文件
+        memset(tx_buffer, 0, sizeof(tx_buffer));
+        while(fread(tx_buffer, sizeof(char), sizeof(tx_buffer), file) > 0)
+        {
+            http_send(tcp, tx_buffer, sizeof(tx_buffer));
+            memset(tx_buffer, 0, sizeof(tx_buffer));
+        }
+        fclose(file);
+    }
 
 }
 
@@ -122,44 +177,75 @@ int http_server_open(uint16_t port) {
 }
 
 // 从FIFO取出请求并处理。新的HTTP请求时会发送到FIFO中等待处理。
-
 void http_server_run(void) {
     tcp_connect_t* tcp;
     char url_path[255];
     char rx_buffer[1024];
 
+    // 一直处理到FIFO队列中没有HTTP请求为止
     while ((tcp = http_fifo_out(&http_fifo_v)) != NULL) {
         int i;
         char* c = rx_buffer;
 
-
         /*
         1、调用get_line从rx_buffer中获取一行数据，如果没有数据，则调用close_http关闭tcp，并继续循环
         */
-
        // TODO
 
+        size_t size = get_line(tcp, c, 1023);
+        if(size == 0)
+        {
+            close_http(tcp);
+            continue;
+        }
 
         /*
         2、检查是否有GET请求，如果没有，则调用close_http关闭tcp，并继续循环
         */
-
        // TODO
 
+        // http请求消息的指针
+        i = 0;
+        // 提取信息的指针
+        int j = 0;
+
+        // http请求消息第一行是GET, POST, HEAD命令的ASCII形式
+        char method[10];
+        // method字段，逐个复制
+        while(c[i] != ' ')
+            method[j++] = c[i++];
+        method[j] = '\0';
+        // memcpy(method, c, 3);
+        // 只处理GET请求
+        if(strcmp(method, "GET"))
+        {
+            close_http(tcp);
+            continue;
+        }
 
         /*
         3、解析GET请求的路径，注意跳过空格，找到GET请求的文件，调用send_file发送文件
         */
-
        // TODO
 
+        // 跳过空格，提取信息的指针归零
+        i++, j=0; 
+
+        // URL字段，逐个复制
+        while(c[i] != ' ')
+            url_path[j++] = c[i++];
+        // 字符串结尾
+        url_path[j] = '\0';
+
+        send_file(tcp, url_path);
 
         /*
         4、调用close_http关掉连接
         */
-
        // TODO
-
+       
+        // 一次http传输
+        close_http(tcp);
 
         printf("!! final close\n");
     }
